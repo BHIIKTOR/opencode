@@ -21223,7 +21223,7 @@
       },
       "Schedule.Outcome": {
         "type": "string",
-        "enum": ["fired", "late", "skipped", "disabled", "expired"]
+        "enum": ["fired", "late", "skipped", "disabled", "failed"]
       },
       "Schedule.Status": {
         "type": "string",
