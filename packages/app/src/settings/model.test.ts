@@ -97,6 +97,7 @@ describe("settings schema", () => {
         timelineWidth: "comfortable",
         newIcons: false,
         newModelPicker: false,
+        newQuestionUI: false,
         mobileTitlebarPosition: "top",
         followUpBehavior: "steer",
       },
@@ -134,6 +135,7 @@ describe("settings schema", () => {
         followUpBehavior: "invalid",
         backgroundActivity: "invalid",
         timelineWidth: "invalid",
+        newQuestionUI: "invalid",
       },
       appearance: { fontSize: "large", mono: "Custom Mono", tabLayout: "vertical", showProjectName: true },
       permissions: { autoApprove: true, autoApproveProjects: { on: true, off: false, bad: "yes" } },
@@ -150,6 +152,7 @@ describe("settings schema", () => {
       followUpBehavior: "steer",
       backgroundActivity: "left",
       timelineWidth: "comfortable",
+      newQuestionUI: false,
     })
     expect(settings.appearance).toEqual({
       fontSize: 14,
@@ -165,6 +168,12 @@ describe("settings schema", () => {
     expect(settings.notifications).toEqual({ agent: false, permissions: true, errors: true })
     expect(settings.sounds).toMatchObject({ agent: "custom", agentEnabled: false, permissions: "staplebops-02" })
     expect(decode(encode(settings))).toEqual(settings)
+  })
+
+  test("round trips an opted-in question UI experiment", () => {
+    const settings = decode({ general: { newQuestionUI: true } })
+    expect(settings.general.newQuestionUI).toBe(true)
+    expect(decode(encode(settings)).general.newQuestionUI).toBe(true)
   })
 
   test.each([undefined, null, false, 7, "invalid", []].map((invalid) => [invalid]))(
