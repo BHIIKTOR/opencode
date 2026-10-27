@@ -1,7 +1,6 @@
 [data-component="dock-prompt"][data-kind="question"]:not([data-variant="experimental"]) {
   --v2-question-answer-bg-selected: color-mix(in srgb, var(--v2-border-border-focus) 15%, transparent);
   --question-feedback-duration: 120ms;
-  --question-selection-duration: var(--question-feedback-duration);
 
   position: relative;
   display: flex;
@@ -201,7 +200,7 @@
     text-align: start;
     cursor: pointer;
     touch-action: manipulation;
-    transition: background-color var(--question-selection-duration) ease;
+    transition: background-color var(--question-feedback-duration) ease;
 
     &::before {
       content: "";
@@ -212,7 +211,7 @@
       background-color: var(--v2-question-answer-bg-selected);
       opacity: 0;
       pointer-events: none;
-      transition: opacity var(--question-selection-duration) ease;
+      transition: opacity var(--question-feedback-duration) ease;
     }
 
     &[data-picked="true"] {
@@ -258,15 +257,13 @@
     background: linear-gradient(180deg, var(--v2-alpha-light-6), var(--v2-alpha-light-0)), var(--v2-background-bg-base);
     box-shadow: inset 0 0 0 0.5px var(--v2-border-border-strong);
 
-    [data-slot="question-option-checkmark"] {
+    [data-slot="icon-svg"] {
       inline-size: 16px;
       block-size: 16px;
       flex: 0 0 16px;
       opacity: 0;
       color: var(--v2-icon-icon-contrast);
-      background-color: currentColor;
-      mask: url("./question-check.svg") center / 16px 16px no-repeat;
-      transition: opacity var(--question-selection-duration) ease;
+      transition: opacity var(--question-feedback-duration) ease;
     }
 
     &[data-type="radio"] {
@@ -281,14 +278,14 @@
       background-color: var(--v2-grey-300);
       box-shadow: var(--v2-elevation-elements);
       opacity: 0;
-      transition: opacity var(--question-selection-duration) ease;
+      transition: opacity var(--question-feedback-duration) ease;
     }
 
     &[data-picked="true"] {
       background:
         linear-gradient(180deg, var(--v2-alpha-light-20), var(--v2-alpha-light-0)), var(--v2-background-bg-accent);
 
-      [data-slot="question-option-checkmark"],
+      [data-slot="icon-svg"],
       [data-slot="question-option-radio-dot"] {
         opacity: 1;
       }
@@ -310,7 +307,7 @@
   [data-slot="question-option-shortcut"] {
     --keybind-font-size: 10px;
     --keybind-font-weight: var(--font-weight-regular);
-    --keybind-transition-duration: var(--question-selection-duration);
+    --keybind-transition-duration: var(--question-feedback-duration);
     align-self: center;
     block-size: 20px;
     pointer-events: none;
@@ -466,7 +463,7 @@
     gap: 8px;
   }
 
-  /* Both labels reserve their width; only the active action is exposed through the button's accessible name. */
+  /* Keep both labels in layout so the button doesn't change width. */
   [data-slot="question-advance-labels"] {
     display: inline-grid;
     place-items: center;

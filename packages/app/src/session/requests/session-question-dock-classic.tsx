@@ -33,7 +33,7 @@ function Mark(props: { multi: boolean; picked: boolean }) {
     <span data-slot="question-option-check" aria-hidden="true">
       <span data-slot="question-option-box" data-type={props.multi ? "checkbox" : "radio"} data-picked={props.picked}>
         <Show when={props.multi} fallback={<span data-slot="question-option-radio-dot" />}>
-          <span data-slot="question-option-checkmark" />
+          <Icon name="check" size="normal" />
         </Show>
       </span>
     </span>

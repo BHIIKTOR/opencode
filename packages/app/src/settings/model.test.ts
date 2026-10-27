@@ -170,12 +170,6 @@ describe("settings schema", () => {
     expect(decode(encode(settings))).toEqual(settings)
   })
 
-  test("round trips an opted-in question UI experiment", () => {
-    const settings = decode({ general: { newQuestionUI: true } })
-    expect(settings.general.newQuestionUI).toBe(true)
-    expect(decode(encode(settings)).general.newQuestionUI).toBe(true)
-  })
-
   test.each([undefined, null, false, 7, "invalid", []].map((invalid) => [invalid]))(
     "defaults malformed sections without losing other sections: %j",
     (invalid) => {

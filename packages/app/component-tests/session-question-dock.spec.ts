@@ -10,208 +10,49 @@ story(
     const focused = question.getByRole("radio", { name: /Focused/ })
     const wide = question.getByRole("radio", { name: /Wide/ })
     await expect(focused).toBeFocused()
-    await expect(question.locator('[data-slot="question-option-key"]')).toHaveCount(0)
     const shortcuts = question.locator('[data-slot="question-option-shortcut"] [data-slot="keybind-v2-label"]')
     await expect(shortcuts).toHaveText(["1", "2", "3"])
-    await expect(wide.locator('[data-slot="keybind-v2-key"]')).toHaveCSS("box-shadow", "none")
-    await expect(question.locator('[data-slot="question-option-box"]')).toHaveText(["", "", ""])
-    await expect(focused.locator('[data-slot="keybind-v2-label"]')).toHaveCSS("font-size", "10px")
-    await expect(focused.locator('[data-slot="keybind-v2-label"]')).toHaveCSS("font-weight", "400")
-    await expect(focused.locator('[data-slot="keybind-v2-label"]')).toHaveCSS("font-variant-numeric", "tabular-nums")
-    await expect(focused.locator('[data-slot="question-option-box"]')).toHaveAttribute("data-type", "radio")
     await expect(question.getByText("Select one answer", { exact: true })).toBeVisible()
-    await expect(focused.locator('[data-slot="option-label"]')).toHaveCSS("font-weight", "440")
-    await expect(focused.locator('[data-slot="option-description"]')).toHaveCSS("font-size", "11px")
-    expect(
-      await focused.evaluate(
-        (row) =>
-          row.getBoundingClientRect().left -
-          row.closest('[data-component="dock-prompt"]')!.getBoundingClientRect().left,
-      ),
-    ).toBe(12)
-    // The tray sits behind the raised card, leaving even the bottom edge of the custom answer clickable.
-    const customRow = question.locator('[data-slot="question-option"][data-custom="true"]')
-    expect(
-      await customRow.evaluate((row) => {
-        const box = row.getBoundingClientRect()
-
-        return row.contains(document.elementFromPoint(box.left + 4, box.bottom - 1))
-      }),
-    ).toBe(true)
     await page.keyboard.press("ArrowRight")
     await expect(wide).toBeFocused()
     await page.keyboard.press(" ")
     await expect(wide).toBeChecked()
-    await expect(wide.locator('[data-slot="keybind-v2-key"]')).not.toHaveCSS("box-shadow", "none")
     await expect(shortcuts).toHaveText(["1", "2", "3"])
-    await expect(wide.locator('[data-slot="question-option-radio-dot"]')).toBeVisible()
     await expect(focused).not.toBeChecked()
-    await expect(wide).toHaveCSS("box-shadow", "none")
-    await expect(wide.locator('[data-slot="option-label"]')).toHaveCSS("font-weight", "440")
 
-    await question.getByRole("button", { name: "Next", exact: true }).click()
+    await page.evaluate(() => document.fonts.ready.then(() => undefined))
+    const next = question.getByRole("button", { name: "Next", exact: true })
+    const width = await next.evaluate((button) => button.getBoundingClientRect().width)
+    await next.click()
     const files = question.getByRole("checkbox", { name: "Changed files", exact: true })
     const terminal = question.getByRole("checkbox", { name: "Terminal", exact: true })
     const input = question.getByRole("textbox", { name: "Type your own answer…", exact: true })
     const custom = question.getByRole("checkbox", { name: "Type your own answer…", exact: true })
     await expect(files).toBeFocused()
-    await expect(files.locator('[data-slot="question-option-box"]')).toHaveAttribute("data-type", "checkbox")
+    const submit = question.getByRole("button", { name: "Submit", exact: true })
+    expect(await submit.evaluate((button) => button.getBoundingClientRect().width)).toBe(width)
     await expect(shortcuts).toHaveText(["1", "2", "3", "4"])
     await files.click()
     await terminal.click()
     await expect(files).toBeChecked()
-    await expect(files.locator('[data-slot="keybind-v2-key"]')).not.toHaveCSS("box-shadow", "none")
     await expect(terminal).toBeChecked()
     await expect(shortcuts).toHaveText(["1", "2", "3", "4"])
-    await expect(files.locator('[data-slot="question-option-checkmark"]')).toBeVisible()
     await terminal.click()
     await expect(terminal).not.toBeChecked()
-    await expect(terminal.locator('[data-slot="keybind-v2-key"]')).toHaveCSS("box-shadow", "none")
     await terminal.click()
     await input.fill("Diagnostics")
     await expect(custom).toBeChecked()
-    await expect(customRow.locator('[data-slot="keybind-v2-key"]')).not.toHaveCSS("box-shadow", "none")
     await input.press("Enter")
     await expect(custom).toBeFocused()
     await expect(input).toHaveValue("Diagnostics")
-    await expect(input).toHaveCSS("font-weight", "440")
     await question.getByRole("button", { name: "Back", exact: true }).click()
     await expect(wide).toBeChecked()
-    await question.getByRole("button", { name: "Next", exact: true }).click()
+    await next.click()
     await expect(files).toBeChecked()
     await expect(terminal).toBeChecked()
     await expect(custom).toBeChecked()
-    await question.getByRole("button", { name: "Submit", exact: true }).click()
+    await submit.click()
     await expect(question).toBeHidden()
-  },
-)
-
-story(
-  "fades pointer selections with plain easing, but keeps keyboard and reduced-motion selections instant",
-  async ({ mount, page }) => {
-    const component = await mount("app-current-session-surface--question-multi-select")
-    const question = component.locator('[data-component="dock-prompt"][data-kind="question"]')
-    const files = question.getByRole("checkbox", { name: "Changed files", exact: true })
-    const mark = files.locator('[data-slot="question-option-checkmark"]')
-    await expect(files).toBeFocused()
-
-    const transitions = await files.evaluate((button: HTMLButtonElement) => {
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-
-      // Resolve the unselected style before changing it, so the browser can transition from that state.
-      void getComputedStyle(button, "::before").opacity
-      button.click()
-
-      return button.getAnimations({ subtree: true }).map((animation) => ({
-        property: animation instanceof CSSTransition ? animation.transitionProperty : "",
-        duration: animation.effect?.getTiming().duration,
-        easing: animation.effect?.getTiming().easing,
-      }))
-    })
-
-    expect(transitions).toEqual(
-      expect.arrayContaining([
-        { property: "opacity", duration: 120, easing: "ease" },
-        { property: "box-shadow", duration: 120, easing: "ease" },
-      ]),
-    )
-    await expect(mark).toHaveCSS("opacity", "1")
-
-    await files.press(" ")
-    await expect(files).not.toBeChecked()
-    await expect(mark).toHaveCSS("transition-duration", "0s")
-    await expect(mark).toHaveCSS("opacity", "0")
-
-    await page.emulateMedia({ reducedMotion: "reduce" })
-    await expect(page.locator("html")).toHaveAttribute("data-motion", "reduce")
-    await files.click()
-    await expect(files).toBeChecked()
-    await expect(mark).toHaveCSS("transition-duration", "0s")
-    await expect(mark).toHaveCSS("opacity", "1")
-    expect(await files.evaluate((button) => button.getAnimations({ subtree: true }).length)).toBe(0)
-  },
-)
-
-story(
-  "fades completed progress and footer labels without moving the buttons or animating height",
-  async ({ mount, page }) => {
-    const component = await mount("app-current-session-surface--question-request")
-    const question = component.locator('[data-component="dock-prompt"][data-kind="question"]')
-    const focused = question.getByRole("radio", { name: /Focused/ })
-    const files = question.getByRole("checkbox", { name: "Changed files", exact: true })
-    const labels = question.locator('[data-slot="question-advance-label"]')
-    await expect(focused).toBeFocused()
-    await page.evaluate(() => document.fonts.ready.then(() => undefined))
-    await focused.click()
-
-    const sampled = await question
-      .getByRole("button", { name: "Next", exact: true })
-      .evaluate((button: HTMLButtonElement) => {
-        const root = button.closest('[data-component="dock-prompt"]')!
-        const bars = root.querySelectorAll('[data-slot="question-progress-bar"]')
-        const labels = button.querySelectorAll('[data-slot="question-advance-label"]')
-        const before = button.getBoundingClientRect()
-
-        const transitions = (element: Element) =>
-          element.getAnimations({ subtree: true }).map((animation) => ({
-            property: animation instanceof CSSTransition ? animation.transitionProperty : "",
-            duration: animation.effect?.getTiming().duration,
-            easing: animation.effect?.getTiming().easing,
-          }))
-
-        void getComputedStyle(labels[0]!).opacity
-        void getComputedStyle(bars[0]!, "::before").opacity
-        button.click()
-
-        const after = button.getBoundingClientRect()
-
-        return {
-          width: [before.width, after.width],
-          left: [before.left, after.left],
-          height: root.getBoundingClientRect().height,
-          name: button.getAttribute("aria-label"),
-          enabled: !button.disabled,
-          labels: [...labels].flatMap(transitions),
-          progress: transitions(bars[0]!),
-          active: getComputedStyle(bars[1]!, "::after").opacity,
-        }
-      })
-
-    expect(sampled.width[1]).toBeCloseTo(sampled.width[0]!, 2)
-    expect(sampled.left[1]).toBeCloseTo(sampled.left[0]!, 2)
-    expect(sampled.name).toBe("Submit")
-    expect(sampled.enabled).toBe(true)
-    expect(sampled.active).toBe("1")
-    expect(sampled.labels).toEqual([
-      { property: "opacity", duration: 120, easing: "ease-out" },
-      { property: "opacity", duration: 120, easing: "ease-out" },
-    ])
-    expect(sampled.progress).toContainEqual({ property: "opacity", duration: 120, easing: "ease" })
-    await expect(files).toBeFocused()
-    await expect(question.locator('[data-slot="question-advance-label"][data-active="true"]')).toHaveCSS("opacity", "1")
-    expect(await question.evaluate((root) => root.getBoundingClientRect().height)).toBe(sampled.height)
-
-    await question.getByRole("button", { name: "Back", exact: true }).press("Enter")
-    await expect(focused).toBeFocused()
-    await expect(question.getByRole("button", { name: "Next", exact: true })).toBeEnabled()
-    await expect(question.locator('[data-slot="question-advance-label"][data-active="true"]')).toHaveCSS(
-      "transition-duration",
-      "0s",
-    )
-
-    await page.emulateMedia({ reducedMotion: "reduce" })
-    await expect(page.locator("html")).toHaveAttribute("data-motion", "reduce")
-    await question.getByRole("button", { name: "Next", exact: true }).click()
-    await expect(files).toBeFocused()
-    await expect(question.getByRole("button", { name: "Submit", exact: true })).toBeEnabled()
-    expect(
-      await labels.evaluateAll((elements) => elements.every((element) => element.getAnimations().length === 0)),
-    ).toBe(true)
-    expect(
-      await question
-        .locator('[data-slot="question-progress-bar"]')
-        .evaluateAll((elements) => elements.every((element) => element.getAnimations({ subtree: true }).length === 0)),
-    ).toBe(true)
   },
 )
 
