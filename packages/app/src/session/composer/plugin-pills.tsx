@@ -25,7 +25,8 @@ const tones: Record<ComposerPillTone, string> = {
   danger: "text-v2-state-fg-danger",
 }
 
-// Plugin pills in the composer lane, after the app's own: on the side away from the lane's aligned edge.
+// Plugin pills in the composer lane, after the app's own: on the side away from the lane's aligned edge. A pill with
+// nothing to show renders no element, so the row hides while it is empty and takes no gap in the lane.
 export function SessionPluginPills(props: {
   session: MountedSession
   screen: SessionScreen
@@ -52,7 +53,7 @@ export function SessionPluginPills(props: {
     <Show when={items().length > 0}>
       <div
         data-component="session-plugin-pills"
-        class="flex min-w-0 shrink items-center gap-2"
+        class="flex min-w-0 shrink items-center gap-2 [&:not(:has(*))]:hidden"
         classList={{ "-order-2": alignment() === "end", "order-2": alignment() !== "end" }}
       >
         <For each={items()}>
