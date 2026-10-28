@@ -408,6 +408,7 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
                         const current = connection()
 
                         if (mcp || !current) return
+
                         return current.type === "credential" ? current.label : `$${current.name}`
                       }
 
