@@ -129,6 +129,8 @@ export const dict = {
   "palette.group.settings": "Settings",
   "palette.session.location": "{{project}} · {{server}}",
 
+  "dialog.provider.title": "Integrations",
+  "dialog.provider.description": "Connect services so OpenCode can use them.",
   "dialog.provider.search.placeholder": "Search providers",
   "dialog.provider.empty": "No providers found",
   "dialog.provider.group.popular": "Popular",
@@ -136,6 +138,7 @@ export const dict = {
   "dialog.provider.group.services": "Services",
   "dialog.provider.environmentOnly": "Environment only",
   "dialog.provider.signInRequired": "Sign in required →",
+  "dialog.provider.needsSignIn": "Needs sign-in",
   "dialog.provider.connected": "Connected",
   "dialog.provider.connections.count.one": "{{count}} connection",
   "dialog.provider.connections.count.other": "{{count}} connections",

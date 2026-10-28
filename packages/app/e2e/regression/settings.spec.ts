@@ -1197,7 +1197,7 @@ test("providers: the connect dialog lists connected providers and manages their 
   await settings.getByRole("button", { name: "Show more providers", exact: true }).click()
   const dialog = page.getByRole("dialog")
   const openai = dialog.locator('[data-provider-id="openai"]')
-  await expect(openai.locator('[data-slot="provider-connected"]')).toHaveText("2 connections")
+  await expect(openai.locator('[data-slot="provider-connected"]')).toHaveText("Work")
   await expect(
     dialog.locator('[data-provider-id="anthropic"]').locator('[data-slot="provider-connected"]'),
   ).toHaveCount(0)
