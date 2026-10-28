@@ -1356,6 +1356,15 @@ test("review file navigation focuses the arrow for the keyboard direction", asyn
   await next.click()
   await expect(file).toHaveText("beta.ts")
   await expect(next).toBeFocused()
+
+  const home = page.getByRole("button", { name: "Home", exact: true })
+  await home.focus()
+  await page.keyboard.press("ArrowRight")
+  await expect(file).toHaveText("gamma.ts")
+  await expect(home).toBeFocused()
+  await page.keyboard.press("ArrowLeft")
+  await expect(file).toHaveText("beta.ts")
+  await expect(home).toBeFocused()
 })
 
 test("restores review state and the side-panel tab per session", async ({ page }) => {

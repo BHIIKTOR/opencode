@@ -214,8 +214,12 @@ export function SessionReviewV2(props: SessionReviewV2Props) {
     const file = previous ? prev() : next()
 
     if (!file) return
+    const active = document.activeElement
+
     event.preventDefault()
     cycle(file)
+
+    if (active !== previousButton && active !== nextButton) return
     ;(previous ? previousButton : nextButton)?.focus({ preventScroll: true })
   })
 
