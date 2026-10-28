@@ -291,19 +291,25 @@ jobs:
         with:
           subject-checksums: packages/process-daemon/dist/SHA256SUMS
       # The monorepo's Latest release drives OpenCode's own update paths, so this release must never become
-      # Latest. It is drafted first because immutable releases lock assets once published.
-      - name: Publish release
+      # Latest. Immutable releases lock a release's assets once it is published, so the release stays a draft
+      # until npm publishing succeeds and is published last. Every step is safe to re-run after a failure.
+      - name: Create draft release
         if: startsWith(github.ref, 'refs/tags/process-daemon-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#process-daemon-v}"
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+          if draft="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft 2>/dev/null)"; then
+            if [ "$draft" != "true" ]; then
+              echo "Release $GITHUB_REF_NAME is already published; its assets are immutable, skipping upload."
+              exit 0
+            fi
+          else
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --latest=false \
               --title "process-daemon v$version" \
               --notes "opencode-pty $version (protocol $PROTOCOL_VERSION) from packages/process-daemon, published to npm as @opencode/pty@$version."
+          fi
           gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS dist/release-manifest.json --clobber --repo "$GITHUB_REPOSITORY"
-          gh release edit "$GITHUB_REF_NAME" --draft=false --latest=false --repo "$GITHUB_REPOSITORY"
       - name: Publish npm packages
         if: startsWith(github.ref, 'refs/tags/process-daemon-v')
         run: |
@@ -317,4 +323,15 @@ jobs:
           name="@opencode/pty"
           if ! npm view "$name@$version" version >/dev/null 2>&1; then
             npm publish dist/npm/opencode-pty --access public --provenance
+          fi
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/process-daemon-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          draft="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft)"
+          if [ "$draft" = "true" ]; then
+            gh release edit "$GITHUB_REF_NAME" --draft=false --latest=false --repo "$GITHUB_REPOSITORY"
+          else
+            echo "Release $GITHUB_REF_NAME is already published."
           fi

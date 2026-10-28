@@ -397,6 +397,16 @@ packages) must list anomalyco/opencode with workflow
 `release-process-daemon.yml` as its trusted publisher, with no environment
 (the release job does not use one).
 
+The release job runs in this order: it uploads the assets to a draft GitHub
+release, publishes the npm packages, and only then publishes the GitHub
+release. Every step is safe to re-run, so if npm publishing fails (for example
+a misconfigured trusted publisher), fix the cause and re-run the failed job
+with `gh run rerun <run-id> --failed`; packages already on npm are skipped.
+
+The repository uses immutable releases: once a GitHub release is published its
+assets and tag are locked and cannot be changed or replaced. A broken published
+release therefore needs a new patch version rather than a fix-up.
+
 Pull requests that change the release pipeline run the same build and npm
 packing without publishing anything.
 
