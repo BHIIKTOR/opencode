@@ -2,14 +2,7 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer, Stream } from "effect"
 import { HttpClientRequest } from "effect/http"
 import { Image, ImageClient, Media } from "../src/effect.js"
-import {
-  Google,
-  OpenAI,
-  OpenAICompatible,
-  VercelAIGateway,
-  XAI,
-  ZAI,
-} from "../src/providers.js"
+import { Google, OpenAI, OpenAICompatible, OpenRouter, VercelAIGateway, XAI, ZAI } from "../src/providers.js"
 import { it } from "./lib/effect.js"
 import { dynamicResponse, json } from "./lib/http.js"
 
@@ -350,6 +343,74 @@ describe("Image", () => {
       ),
     ),
   )
+
+  describe("gateway and Google sizing", () => {
+    const sent = (expected: Record<string, unknown>, response: unknown = { data: [{ b64_json: "AQID" }] }) =>
+      layer((input) => {
+        expect(JSON.parse(input.text)).toEqual(expected)
+        return Effect.succeed(json(input, response))
+      })
+    const prompt = "A lighthouse"
+    const openrouter = OpenRouter.configure({ apiKey: "test", baseURL: "https://openrouter.test/v1" })
+
+    it.effect("sends OpenRouter an aspect ratio and resolution tier instead of pixels", () =>
+      Image.generate({
+        model: openrouter.image("google/gemini-3.1-flash-image"),
+        prompt,
+        aspect: "16:9",
+        resolution: "0.5K",
+      }).pipe(
+        Effect.provide(
+          sent({ model: "google/gemini-3.1-flash-image", prompt, aspect_ratio: "16:9", resolution: "512" }),
+        ),
+      ),
+    )
+
+    it.effect("leaves out a resolution OpenRouter doesn't list", () =>
+      Image.generate({ model: openrouter.image("x/y"), prompt, aspect: "1:1", resolution: "8K" }).pipe(
+        Effect.provide(sent({ model: "x/y", prompt, aspect_ratio: "1:1" })),
+      ),
+    )
+
+    for (const modelID of ["spacexai/grok-imagine-image", "xai/grok-imagine-image"])
+      it.effect(`sizes Vercel AI Gateway ${modelID} through xAI provider options`, () =>
+        Image.generate({
+          model: VercelAIGateway.configure({ apiKey: "test", baseURL: "https://gateway.test/v1" }).image(modelID),
+          prompt,
+          aspect: "16:9",
+          resolution: "2K",
+        }).pipe(
+          Effect.provide(
+            sent({ model: modelID, prompt, providerOptions: { xai: { aspect_ratio: "16:9", resolution: "2k" } } }),
+          ),
+        ),
+      )
+
+    it.effect("names Google's half tier 512", () =>
+      Image.generate({
+        model: Google.configure({ apiKey: "test", baseURL: "https://google.test/v1beta" }).image(
+          "gemini-3.1-flash-image",
+        ),
+        prompt,
+        aspect: "1:1",
+        resolution: "0.5K",
+      }).pipe(
+        Effect.provide(
+          layer((input) => {
+            expect(JSON.parse(input.text).generationConfig.imageConfig).toEqual({
+              aspectRatio: "1:1",
+              imageSize: "512",
+            })
+            return Effect.succeed(
+              json(input, {
+                candidates: [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: "AQID" } }] } }],
+              }),
+            )
+          }),
+        ),
+      ),
+    )
+  })
 
   it.effect("preserves native snake_case and unknown request options", () =>
     Image.generate({

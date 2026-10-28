@@ -174,10 +174,14 @@ const sizes = (model: string): ImageSizing.Limits | ReadonlyArray<ImageSizing.Si
   return { multiple: 16 }
 }
 
-const size = (request: Request) => {
+/** The body fields `aspect` and `resolution` lower to; gateways that read other fields than `size` pass their own. */
+export type OpenAIImageSizing = (request: Request) => Record<string, unknown> | undefined
+
+const pixelSize: OpenAIImageSizing = (request) => {
   if (!ImageSizing.isRequested(request)) return undefined
   const options = sizes(request.model.id)
-  return "multiple" in options ? ImageSizing.fit(request, options) : ImageSizing.nearest(request, options)
+  const size = "multiple" in options ? ImageSizing.fit(request, options) : ImageSizing.nearest(request, options)
+  return { size: `${size.width}x${size.height}` }
 }
 
 const streamOptions = (request: MediaProtocol.Addressed<Request>) => {
@@ -198,7 +202,10 @@ const reference = (asset: Media.Asset, provider: ProviderID) =>
     Effect.map((item) => (item.type === "ref" ? { file_id: item.value } : { image_url: item.value })),
   )
 
-const fromRequest = Effect.fn("OpenAIImages.fromRequest")(function* (request: MediaProtocol.Addressed<Request>) {
+const fromRequest = Effect.fn("OpenAIImages.fromRequest")(function* (
+  request: MediaProtocol.Addressed<Request>,
+  sizing: OpenAIImageSizing,
+) {
   const images = request.images ?? []
   const mask = request.providerOptions?.mask
   if (mask !== undefined && images.length === 0)
@@ -207,11 +214,10 @@ const fromRequest = Effect.fn("OpenAIImages.fromRequest")(function* (request: Me
     return yield* ProviderShared.invalidRequest(
       "OpenAI providerOptions.size replaces aspect and resolution; set one or the other",
     )
-  const chosen = size(request)
   const fields = mergeJsonRecords(
     {
       n: request.n,
-      size: chosen === undefined ? undefined : `${chosen.width}x${chosen.height}`,
+      ...sizing(request),
       ...(yield* streamOptions(request)),
     },
     nativeOptions(request.providerOptions),
@@ -353,29 +359,40 @@ const finish = (state: State, context: MediaProtocol.ResponseContext<Request>) =
 // 7. Protocol and route
 // ---------------------------------------------------------------------------
 
-export const protocol = MediaProtocol.stream<Request, ImageEvent, Frame, State>(route, {
-  body: { from: fromRequest },
-  frames: (bytes, context) =>
-    context.request.mode === "stream"
-      ? Framing.sse.frame(bytes)
-      : Framing.document.frame(bytes).pipe(Stream.map((document) => ({ document }))),
-  initial: () => ({ completed: 0 }),
-  step,
-  finish,
-})
+const makeProtocol = (sizing: OpenAIImageSizing) =>
+  MediaProtocol.stream<Request, ImageEvent, Frame, State>(route, {
+    body: { from: (request) => fromRequest(request, sizing) },
+    frames: (bytes, context) =>
+      context.request.mode === "stream"
+        ? Framing.sse.frame(bytes)
+        : Framing.document.frame(bytes).pipe(Stream.map((document) => ({ document }))),
+    initial: () => ({ completed: 0 }),
+    step,
+    finish,
+  })
 
-/** `provider` attributes models, refs, and metadata to an OpenAI-compatible host; it defaults to `openai`. */
-export const model = (input: MediaRoute.ModelInput & { readonly provider?: string }) =>
-  ImageModel.fromRoute<OpenAIImageOptions, Frame, State>(
+export const protocol = makeProtocol(pixelSize)
+
+/**
+ * `provider` attributes models, refs, and metadata to an OpenAI-compatible host; it defaults to `openai`. `sizing`
+ * replaces the `size` that `aspect` and `resolution` lower to.
+ */
+export const model = (
+  input: MediaRoute.ModelInput & { readonly provider?: string; readonly sizing?: OpenAIImageSizing },
+) => {
+  const base = input.sizing === undefined ? protocol : makeProtocol(input.sizing)
+  return ImageModel.fromRoute<OpenAIImageOptions, Frame, State>(
     {
-      protocol: input.provider === undefined ? protocol : { ...protocol, provider: ProviderID.make(input.provider) },
+      protocol: input.provider === undefined ? base : { ...base, provider: ProviderID.make(input.provider) },
       baseURL: DEFAULT_BASE_URL,
       path: ({ request }) => (isEdit(request) ? EDIT_PATH : PATH),
     },
     input,
   )
+}
 
 export const OpenAIImages = {
   protocol,
   model,
+  pixelSize,
 } as const
