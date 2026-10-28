@@ -61,7 +61,7 @@ export function SessionPluginPills(props: {
         <For each={items()}>
           {(item) => (
             <Contribution plugin={item.plugin}>
-              {() => <PluginPill pill={item.value} input={input} alignment={alignment} />}
+              {() => <PluginPill plugin={item.plugin} pill={item.value} input={input} alignment={alignment} />}
             </Contribution>
           )}
         </For>
@@ -70,7 +70,12 @@ export function SessionPluginPills(props: {
   )
 }
 
-function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; alignment: Accessor<Alignment> }) {
+function PluginPill(props: {
+  plugin: string
+  pill: ComposerPill
+  input: ComposerPillProps
+  alignment: Accessor<Alignment>
+}) {
   const alignment = props.alignment
   const view = createMemo(() => props.pill.show(props.input))
   const placement = () => (({ center: "top", start: "top-start", end: "top-end" }) as const)[alignment()]
@@ -88,7 +93,7 @@ function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; align
               class={capsule}
               onClick={() => current().run?.()}
             >
-              <Content view={current()} />
+              <Content plugin={props.plugin} pill={props.pill} input={props.input} view={current()} />
             </button>
           }
         >
@@ -107,7 +112,7 @@ function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; align
                   aria-label={current().title}
                   class={capsule}
                 >
-                  <Content view={current()} />
+                  <Content plugin={props.plugin} pill={props.pill} input={props.input} view={current()} />
                 </Popover.Trigger>
                 <Popover.Portal>
                   <Popover.Content
@@ -115,11 +120,6 @@ function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; align
                     aria-label={current().title ?? current().label}
                     class="w-80 max-w-[calc(100vw-56px)] rounded-[10px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-01 p-1 shadow-[var(--v2-elevation-floating)] outline-none"
                   >
-                    <div class="px-2 pt-1 pb-1.5 text-[11px] font-[530] tracking-[0.05px] leading-[var(--line-height-tight)] text-v2-text-text-faint">
-                      <span dir="auto" class="line-clamp-3 break-words">
-                        {current().title ?? current().label}
-                      </span>
-                    </div>
                     {/* Untracked: the content renders once per open; its own reactivity updates it in place. */}
                     {untrack(() =>
                       menu()({
@@ -147,7 +147,7 @@ function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; align
                   aria-label={current().title}
                   class={capsule}
                 >
-                  <Content view={current()} />
+                  <Content plugin={props.plugin} pill={props.pill} input={props.input} view={current()} />
                 </Menu.Trigger>
                 <Menu.Portal>
                   <Menu.Content data-slot="session-plugin-pill-menu" aria-label={current().title ?? current().label}>
@@ -184,10 +184,22 @@ function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; align
   )
 }
 
-function Content(props: { view: ComposerPillView }): JSX.Element {
+function Content(props: {
+  plugin: string
+  pill: ComposerPill
+  input: ComposerPillProps
+  view: ComposerPillView
+}): JSX.Element {
   return (
     <>
-      <PillIcon name={props.view.icon} tone={props.view.tone} />
+      <Show when={props.pill.icon} fallback={<PillIcon name={props.view.icon} tone={props.view.tone} />}>
+        {(icon) => (
+          // Its own contribution: an icon that throws shows nothing and the pill keeps working.
+          <span data-slot="session-plugin-pill-icon" class="flex size-4 shrink-0 items-center justify-center">
+            <Contribution plugin={props.plugin}>{() => icon()(props.input)}</Contribution>
+          </span>
+        )}
+      </Show>
       <span dir="auto" class="min-w-0 max-w-[260px] truncate">
         {props.view.label}
       </span>
