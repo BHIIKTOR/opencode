@@ -1,9 +1,10 @@
-import { ComposerPill, type ComposerPillProps, type Plugin } from "@opencode/plugin/gui"
-import { SessionGoal } from "@opencode/schema/session-goal"
+import { onCleanup, Show } from "solid-js"
+import { createStore } from "solid-js/store"
+import { ComposerPill, createKeyed, type ComposerPillProps, type Plugin } from "@opencode/plugin/gui"
+import { Goal } from "@opencode/schema/goal"
 import { Button } from "@opencode/ui/button"
 import { showToast } from "@opencode/ui/toast"
-import { Show } from "solid-js"
-import type Goal from "./index"
+import type GoalDefinition from "./index"
 
 const status = {
   active: { label: "title", icon: "outline-steer", tone: undefined },
@@ -13,16 +14,55 @@ const status = {
 
 /**
  * The session's `/goal` above its composer: the status as a pill, and a popover headed by the objective with the
- * actions that apply. The server's goal plugin keeps the goal in the session's metadata; a bare `/goal` shows the last
+ * actions that apply. The server's goal plugin owns the goal and serves it over its RPC; a bare `/goal` shows the last
  * reason.
  */
-const setup: Plugin.Setup<typeof Goal> = (ctx) => {
-  // A goal copied from the parent belongs to the parent, so only the session's own goal shows.
-  const goal = (input: ComposerPillProps) => {
-    const session = input.session.server.data.session.get(input.session.id)
+const setup: Plugin.Setup<typeof GoalDefinition> = (ctx) => {
+  // The last goal heard for each server and session. A session switched back to shows it until the refetch lands.
+  const [goals, setGoals] = createStore<Record<string, { goal: Goal.State | null }>>({})
+  const key = (server: string, sessionID: string) => `${server}\u0000${sessionID}`
+  const goal = (input: ComposerPillProps) => goals[key(input.session.server.id, input.session.id)]?.goal
 
-    return session && SessionGoal.fromMetadata(session.id, session.metadata)
-  }
+  // Subscribes to the routed session's goal: its current value, then every change. It runs again when another session
+  // is routed, the session moves, or its server reconnects, since changes published meanwhile were missed.
+  createKeyed(
+    () => {
+      const session = ctx.sessions.current()
+
+      return session?.server.connected ? key(session.server.id, session.id) + `\u0000${session.directory}` : undefined
+    },
+    () => {
+      const session = ctx.sessions.current()
+
+      if (!session) return
+
+      const server = session.server.id
+      const rpc = session.server.client.rpc(Goal.Definition)
+      const controller = new AbortController()
+      // A change that arrives before the snapshot is newer than it.
+      const heard = { value: false }
+      onCleanup(() => controller.abort())
+      onCleanup(
+        rpc.events.on(
+          "changed",
+          (event) => {
+            if (event.data.sessionID === session.id) heard.value = true
+            setGoals(key(server, event.data.sessionID), { goal: event.data.goal })
+          },
+          { signal: controller.signal },
+        ),
+      )
+      // A server without the goal plugin answers with an error, and the session shows no goal.
+      void rpc
+        .get({ sessionID: session.id }, { location: { directory: session.directory }, signal: controller.signal })
+        .then(
+          (next) => {
+            if (!controller.signal.aborted && !heard.value) setGoals(key(server, session.id), { goal: next })
+          },
+          () => undefined,
+        )
+    },
+  )
 
   const command = (input: ComposerPillProps, text: "pause" | "resume" | "clear") =>
     void input.session.server.client.session
