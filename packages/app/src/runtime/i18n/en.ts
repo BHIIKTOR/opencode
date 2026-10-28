@@ -161,9 +161,7 @@ export const dict = {
   "dialog.model.favorites": "Favorites",
   "dialog.model.recent": "Recent",
   "dialog.model.hint.navigate": "Navigate",
-  "dialog.model.hint.variant": "Variant",
   "dialog.model.hint.select": "Select",
-  "dialog.model.hint.favorite": "Favorite",
   "dialog.model.favorite": "Favorite",
   "dialog.model.unfavorite": "Unfavorite",
 
@@ -771,8 +769,6 @@ export const dict = {
   "settings.experimental.description": "Try experimental features",
   "settings.experimental.row.newIcons.title": "New icons",
   "settings.experimental.row.newIcons.description": "Preview the updated icon set",
-  "settings.experimental.row.newModelPicker.title": "New model picker",
-  "settings.experimental.row.newModelPicker.description": "Preview the redesigned model picker",
   "settings.plugins.reload": "Reload",
   "settings.plugins.status.loading": "Loading",
   "settings.plugins.status.failed": "Failed",

@@ -129,8 +129,6 @@ const generalSchema = Persistence.struct({
   timelineWidth: Schema.Literals(["focused", "comfortable", "wide"]),
   // The "New icons" design experiment, off until it ships.
   newIcons: Schema.Boolean,
-  // The "New model picker" design experiment, off until it ships.
-  newModelPicker: Schema.Boolean,
   mobileTitlebarPosition: Schema.Literals(["top", "bottom"]),
   // Owned by the review plugin, which copies it out once; kept so settings rewrites cannot drop it first.
   mobileDiffWrap: Persistence.optional(Schema.Boolean),
@@ -299,7 +297,6 @@ export const defaultSettings: Settings = {
     backgroundActivity: "left",
     timelineWidth: "comfortable",
     newIcons: false,
-    newModelPicker: false,
     mobileTitlebarPosition: "top",
     followUpBehavior: "steer",
   },
@@ -407,10 +404,6 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         newIcons,
         setNewIcons(value: boolean) {
           setStore("general", "newIcons", value)
-        },
-        newModelPicker: withFallback(() => store.general?.newModelPicker, defaultSettings.general.newModelPicker),
-        setNewModelPicker(value: boolean) {
-          setStore("general", "newModelPicker", value)
         },
         mobileTitlebarPosition: withFallback(
           () => store.general?.mobileTitlebarPosition,
