@@ -5,7 +5,7 @@ import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-prog
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useSettings } from "@/settings/model"
-import { useComposerLaneAlignment } from "./composer-lane"
+import { composerLanePlacement, useComposerLaneAlignment } from "./composer-lane"
 import "./activity-chips.css"
 
 export type SessionActivityItem = {
@@ -57,8 +57,6 @@ export function SessionActivityChips(props: {
     settings.general.backgroundActivity() !== "off" && (props.subagents.length > 0 || props.shells.length > 0)
 
   const alignment = useComposerLaneAlignment()
-
-  const placement = () => (({ center: "top", start: "top-start", end: "top-end" }) as const)[alignment()]
 
   // A subagent can only be interrupted once its child session exists.
   const stoppable = (item: SessionActivityItem) => item.type === "shell" || !!item.sessionID
@@ -137,13 +135,14 @@ export function SessionActivityChips(props: {
   return (
     <Show when={active()}>
       <div data-component="session-activity-chips" class="flex min-w-0 shrink items-center">
-        <Menu gutter={8} placement={placement()} onOpenChange={setOpen}>
+        <Menu gutter={8} placement={composerLanePlacement(alignment())} onOpenChange={setOpen}>
           <Menu.Trigger
             as="button"
             type="button"
             data-slot="session-activity-chip"
+            data-composer-pill
             aria-label={label()}
-            class="pointer-events-auto flex h-7 min-w-0 max-w-full items-center gap-2 rounded-[12px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-base ps-2.5 pe-2.5 text-[13px] font-[440] leading-text-compact tracking-[-0.04px] whitespace-nowrap tabular-nums text-v2-text-text-base shadow-[var(--v2-elevation-raised)] outline-none duration-150 ease-out motion-reduce:animate-none"
+            class="tabular-nums duration-150 ease-out motion-reduce:animate-none"
             classList={{ "animate-in fade-in": enter() }}
           >
             <SessionProgressIndicatorV2 class="shrink-0" />

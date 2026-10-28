@@ -12,10 +12,7 @@ import {
 } from "@opencode/plugin/gui"
 import { usePluginHost } from "@/runtime/plugin/host"
 import { Contribution } from "@/runtime/plugin/render"
-import type { useComposerLaneAlignment } from "./composer-lane"
-
-const capsule =
-  "pointer-events-auto flex h-7 min-w-0 max-w-full items-center gap-2 rounded-[12px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-base ps-2.5 pe-2.5 text-[13px] font-[440] leading-text-compact tracking-[-0.04px] whitespace-nowrap text-v2-text-text-base shadow-[var(--v2-elevation-raised)] outline-none"
+import { composerLanePlacement, type useComposerLaneAlignment } from "./composer-lane"
 
 type Alignment = ReturnType<ReturnType<typeof useComposerLaneAlignment>>
 
@@ -70,7 +67,6 @@ export function SessionPluginPills(props: {
 function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; alignment: Accessor<Alignment> }) {
   const alignment = props.alignment
   const view = createMemo(() => props.pill.show(props.input))
-  const placement = () => (({ center: "top", start: "top-start", end: "top-end" }) as const)[alignment()]
 
   return (
     <Show when={view()}>
@@ -82,7 +78,7 @@ function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; align
               type="button"
               data-slot="session-plugin-pill"
               aria-label={current().title}
-              class={capsule}
+              data-composer-pill
               onClick={() => current().run?.()}
             >
               <Content view={current()} />
@@ -90,13 +86,13 @@ function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; align
           }
         >
           {(rows) => (
-            <Menu gutter={8} placement={placement()}>
+            <Menu gutter={8} placement={composerLanePlacement(alignment())}>
               <Menu.Trigger
                 as="button"
                 type="button"
                 data-slot="session-plugin-pill"
                 aria-label={current().title}
-                class={capsule}
+                data-composer-pill
               >
                 <Content view={current()} />
               </Menu.Trigger>
