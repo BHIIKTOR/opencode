@@ -1141,4 +1141,20 @@ describe("Image", () => {
       ),
     ),
   )
+
+  it.effect("fails a Black Forest Labs generation that ends with No Card Generated", () =>
+    Effect.gen(function* () {
+      const error = yield* Image.resume(BlackForestLabs.configure({ apiKey: "test" }).image("flux-2-pro"), {
+        id: "req_1",
+        pollingURL: "https://bfl.test/v1/get_result?id=req_1",
+      }).pipe(
+        Effect.flatMap((generation) => generation.await()),
+        Effect.flip,
+      )
+      expect(error.reason._tag).toBe("ProviderInternal")
+      expect(error.message).toBe("Black Forest Labs generation req_1 ended with No Card Generated")
+    }).pipe(
+      Effect.provide(layer((input) => Effect.succeed(json(input, { id: "req_1", status: "No Card Generated" })))),
+    ),
+  )
 })

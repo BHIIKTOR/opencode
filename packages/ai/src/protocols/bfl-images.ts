@@ -76,6 +76,7 @@ const STATUS = {
   // Moderation is terminal; `decodeResult` reports it as a content-policy failure.
   "Content Moderated": "failed",
   "Request Moderated": "failed",
+  "No Card Generated": "failed",
   "Task not found": "expired",
 } as const satisfies Record<string, Status>
 
@@ -178,7 +179,7 @@ const decodeStatus = Effect.fn("BlackForestLabsImages.decodeStatus")(function* (
   context: MediaProtocol.PollContext<Token>,
 ) {
   const output = yield* decodeDocument(response)
-  return { id: context.token.id, status: yield* MediaProtocol.status(STATUS, output.value.status, output) }
+  return { id: context.token.id, status: MediaProtocol.status(STATUS, output.value.status) }
 })
 
 const decodeResult = Effect.fn("BlackForestLabsImages.decodeResult")(function* (
@@ -187,7 +188,7 @@ const decodeResult = Effect.fn("BlackForestLabsImages.decodeResult")(function* (
 ) {
   const output = yield* decodeDocument(response)
   const document = output.value
-  const status = yield* MediaProtocol.status(STATUS, document.status, output)
+  const status = MediaProtocol.status(STATUS, document.status)
   if (isModerated(document.status)) return yield* output.contentPolicy(`${route.name} moderated the generation`)
   if (status === "failed" || status === "expired")
     return yield* output.ended(status, `${route.name} generation ${context.token.id} ended with ${document.status}`)

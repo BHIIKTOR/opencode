@@ -108,7 +108,7 @@ const decodeStart = Effect.fn("ReplicateImages.decodeStart")(function* (
   return {
     token: { id: prediction.id, getURL: prediction.urls.get, cancelURL: prediction.urls.cancel },
     // `Prefer: wait` can return an already-finished prediction, so `await` skips straight to the result.
-    snapshot: { id: prediction.id, status: yield* MediaProtocol.status(STATUS, prediction.status, output) },
+    snapshot: { id: prediction.id, status: MediaProtocol.status(STATUS, prediction.status) },
   }
 })
 
@@ -117,7 +117,7 @@ const decodeStatus = Effect.fn("ReplicateImages.decodeStatus")(function* (
   context: MediaProtocol.PollContext<Token>,
 ) {
   const output = yield* decodePrediction(response)
-  return { id: context.token.id, status: yield* MediaProtocol.status(STATUS, output.value.status, output) }
+  return { id: context.token.id, status: MediaProtocol.status(STATUS, output.value.status) }
 })
 
 const decodeResult = Effect.fn("ReplicateImages.decodeResult")(function* (
@@ -126,7 +126,7 @@ const decodeResult = Effect.fn("ReplicateImages.decodeResult")(function* (
 ) {
   const output = yield* decodePrediction(response)
   const prediction = output.value
-  const status = yield* MediaProtocol.status(STATUS, prediction.status, output)
+  const status = MediaProtocol.status(STATUS, prediction.status)
   if (status === "failed" || status === "cancelled" || status === "expired")
     return yield* output.ended(
       status,

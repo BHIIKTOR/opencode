@@ -73,7 +73,7 @@ export const protocol = <Request, Response>(
       decode: Effect.fn("FalQueue.decodeStatus")(function* (response, context) {
         const output = yield* decodeQueueStatus(response)
         const decoded = output.value
-        const status = yield* MediaProtocol.status(STATUS, decoded.status, output)
+        const status = MediaProtocol.status(STATUS, decoded.status)
         // fal reports request failures as COMPLETED with an `error`; the response endpoint carries the details.
         const failed = status === "completed" && decoded.error !== undefined && decoded.error !== null
         return {
