@@ -30,6 +30,7 @@ const permission = permissionLayer({
       : Effect.void,
 })
 
+const wakes: Session.ID[] = []
 const executionNode = makeGlobalNode({
   service: SessionExecution.Service,
   layer: Layer.succeed(
@@ -38,7 +39,7 @@ const executionNode = makeGlobalNode({
       active: Effect.succeed(new Set<Session.ID>()),
       isActive: () => Effect.succeed(false),
       resume: () => Effect.void,
-      wake: () => Effect.void,
+      wake: (sessionID) => Effect.sync(() => void wakes.push(sessionID)),
       interrupt: () => Effect.succeed(false),
       awaitIdle: () => Effect.void,
     }),
@@ -109,9 +110,12 @@ describe("AskTool", () => {
         const target = yield* createSession(dir.path, "Target")
         const registry = yield* Tool.Service
 
+        wakes.length = 0
         const result = yield* ask(registry, asker.id, { session: target.id, question: "Which auth header?" })
         expect(result.status).toBe("completed")
         expect(result.content).toEqual([{ type: "text", text: expect.stringContaining("do not wait or poll") }])
+        expect(result.content).toEqual([{ type: "text", text: expect.stringContaining("you are not woken") }])
+        expect(wakes).toEqual([target.id])
 
         const [item] = yield* syntheticInbox(target.id)
         expect(item?.delivery).toBe("queue")
@@ -122,6 +126,7 @@ describe("AskTool", () => {
           to: target.id,
           from_title: "Asker",
           question: "Which auth header?",
+          "opencode.origin": { kind: "session", sessionID: asker.id, title: "Asker" },
         })
         expect(item?.payload.text).toContain("It is not from the user")
         expect(item?.payload.text).toContain(`"question_id": "${item?.id}"`)
@@ -172,6 +177,44 @@ describe("AskTool", () => {
             error: { message: expect.stringContaining(`Session ${unknown} was not found`) },
           })
           expect(yield* syntheticInbox(target.id)).toHaveLength(0)
+        }),
+      ),
+    ),
+  )
+
+  it.live("scopes title discovery to this project's top-level sessions", () =>
+    withTempDir((mine) =>
+      withTempDir((theirs) =>
+        Effect.gen(function* () {
+          const asker = yield* createSession(mine.path, "Asker")
+          const target = yield* createSession(mine.path, "Deploy plan")
+          const elsewhere = yield* createSession(theirs.path, "Deploy plan")
+          const child = yield* createChild(asker.id, "Deploy plan")
+          const registry = yield* Tool.Service
+
+          // A same-title session in another project or a child session is neither an ambiguity nor a candidate.
+          expect(yield* ask(registry, asker.id, { session: "Deploy plan", question: "when?" })).toMatchObject({
+            status: "completed",
+            output: { to: target.id },
+          })
+          expect(elsewhere.id).not.toBe(target.id)
+          expect(child.parentID).toBe(asker.id)
+
+          // A title that only exists outside this project's top level never leaks that session.
+          const hidden = yield* createSession(theirs.path, "Their roadmap")
+          const hiddenChild = yield* createChild(asker.id, "Child roadmap")
+          const missing = yield* ask(registry, asker.id, { session: "Their roadmap", question: "their?" })
+          const missingMessage = missing.error?.message ?? ""
+          expect(missing.status).toBe("error")
+          expect(missingMessage).toContain("No session titled")
+          expect(missingMessage).not.toContain(hidden.id)
+
+          const childOnly = yield* ask(registry, asker.id, { session: "Child roadmap", question: "child?" })
+          const childOnlyMessage = childOnly.error?.message ?? ""
+          expect(childOnly.status).toBe("error")
+          expect(childOnlyMessage).toContain("No session titled")
+          expect(childOnlyMessage).not.toContain(hiddenChild.id)
+          expect(yield* syntheticInbox(target.id)).toHaveLength(1)
         }),
       ),
     ),
@@ -242,6 +285,7 @@ describe("AskTool", () => {
           kind: "answer",
           replyTo: question.id,
           from: target.id,
+          "opencode.origin": { kind: "session", sessionID: target.id, title: "Target" },
         })
         expect(reply?.payload.text).toContain(`to your question ${question.id}`)
         expect(reply?.payload.text).toContain("do not reply to it")
@@ -252,6 +296,31 @@ describe("AskTool", () => {
           status: "error",
           error: { message: expect.stringContaining("already has an answer") },
         })
+      }),
+    ),
+  )
+
+  it.live("wakes the target for a question but never wakes the asker for an answer", () =>
+    withTempDir((dir) =>
+      Effect.gen(function* () {
+        const asker = yield* createSession(dir.path, "Asker")
+        const target = yield* createSession(dir.path, "Target")
+        const registry = yield* Tool.Service
+
+        wakes.length = 0
+        yield* ask(registry, asker.id, { session: target.id, question: "Which auth header?" })
+        expect(wakes).toEqual([target.id])
+
+        wakes.length = 0
+        const [question] = yield* syntheticInbox(target.id)
+        if (question === undefined) return yield* Effect.die(new Error("expected a pending question"))
+        expect(yield* answer(registry, target.id, { replyTo: question.id, answer: "Use Bearer." })).toMatchObject({
+          status: "completed",
+        })
+        // resume:false keeps the reply from waking the asker into an unattended run.
+        expect(wakes).toEqual([])
+        const [reply] = yield* syntheticInbox(asker.id)
+        expect(reply?.delivery).toBe("steer")
       }),
     ),
   )
@@ -268,15 +337,59 @@ describe("AskTool", () => {
         })
         expect(yield* ask(registry, asker.id, { session: target.id, question: "q1" })).toMatchObject({
           status: "error",
-          error: { message: expect.stringContaining("already has that exact question pending") },
+          error: { message: expect.stringContaining("already has that exact question unanswered") },
         })
         yield* ask(registry, asker.id, { session: target.id, question: "q2" })
         yield* ask(registry, asker.id, { session: target.id, question: "q3" })
         expect(yield* ask(registry, asker.id, { session: target.id, question: "q4" })).toMatchObject({
           status: "error",
-          error: { message: expect.stringContaining("already has 3 questions") },
+          error: { message: expect.stringContaining("already has 3 unanswered questions") },
         })
         expect(yield* syntheticInbox(target.id)).toHaveLength(3)
+      }),
+    ),
+  )
+
+  it.live("counts delivered questions as unanswered and frees the slot once answered", () =>
+    withTempDir((dir) =>
+      Effect.gen(function* () {
+        const sessions = yield* Session.Service
+        const database = yield* Database.Service
+        const bus = yield* Bus.Service
+        const asker = yield* createSession(dir.path, "Asker")
+        const target = yield* createSession(dir.path, "Target")
+        const registry = yield* Tool.Service
+
+        yield* ask(registry, asker.id, { session: target.id, question: "q1" })
+        yield* ask(registry, asker.id, { session: target.id, question: "q2" })
+        yield* ask(registry, asker.id, { session: target.id, question: "q3" })
+        yield* SessionInbox.promote(database.db, bus, target.id, "input")
+        yield* SessionInbox.promote(database.db, bus, target.id, "input")
+        yield* SessionInbox.promote(database.db, bus, target.id, "input")
+        const promoted = (yield* sessions.context(target.id)).filter((message) => message.type === "synthetic")
+        expect(promoted).toHaveLength(3)
+        const answered = promoted[0]
+        if (answered === undefined) return yield* Effect.die(new Error("expected three delivered questions"))
+
+        // Promotion does not free a slot: the questions are still unanswered.
+        expect(yield* ask(registry, asker.id, { session: target.id, question: "q1" })).toMatchObject({
+          status: "error",
+          error: { message: expect.stringContaining("already has that exact question unanswered") },
+        })
+        expect(yield* ask(registry, asker.id, { session: target.id, question: "q4" })).toMatchObject({
+          status: "error",
+          error: { message: expect.stringContaining("already has 3 unanswered questions") },
+        })
+
+        // Answering a delivered question frees its slot and releases its duplicate guard.
+        yield* answer(registry, target.id, { replyTo: answered.id, answer: "one" })
+        expect(yield* ask(registry, asker.id, { session: target.id, question: "q1" })).toMatchObject({
+          status: "completed",
+        })
+        expect(yield* ask(registry, asker.id, { session: target.id, question: "q4" })).toMatchObject({
+          status: "error",
+          error: { message: expect.stringContaining("already has 3 unanswered questions") },
+        })
       }),
     ),
   )
@@ -307,6 +420,7 @@ describe("AskTool", () => {
             from: asker.id,
             to: target.id,
             from_title: "Asker",
+            "opencode.origin": { kind: "session", sessionID: asker.id, title: "Asker" },
           },
         })
 
@@ -318,9 +432,44 @@ describe("AskTool", () => {
           type: "synthetic",
           delivery: "steer",
           payload: {
-            metadata: { source: "ask", kind: "answer", replyTo: queued.id, from: target.id },
+            metadata: {
+              source: "ask",
+              kind: "answer",
+              replyTo: queued.id,
+              from: target.id,
+              "opencode.origin": { kind: "session", sessionID: target.id, title: "Target" },
+            },
             text: expect.stringContaining("Session answer."),
           },
+        })
+      }),
+    ),
+  )
+
+  it.live("stamps the shared session origin on both legs", () =>
+    withTempDir((dir) =>
+      Effect.gen(function* () {
+        const asker = yield* createSession(dir.path, "Asker")
+        const target = yield* createSession(dir.path, "Target")
+        const registry = yield* Tool.Service
+
+        yield* ask(registry, asker.id, { session: target.id, question: "Which auth header?" })
+        const [question] = yield* syntheticInbox(target.id)
+        if (question === undefined) return yield* Effect.die(new Error("expected a pending question"))
+        expect(question.payload.metadata?.["opencode.origin"]).toEqual({
+          kind: "session",
+          sessionID: asker.id,
+          title: "Asker",
+        })
+
+        expect(yield* answer(registry, target.id, { replyTo: question.id, answer: "Use Bearer." })).toMatchObject({
+          status: "completed",
+        })
+        const [reply] = yield* syntheticInbox(asker.id)
+        expect(reply?.payload.metadata?.["opencode.origin"]).toEqual({
+          kind: "session",
+          sessionID: target.id,
+          title: "Target",
         })
       }),
     ),
