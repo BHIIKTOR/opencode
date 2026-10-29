@@ -126,7 +126,6 @@ describe("AskTool", () => {
           to: target.id,
           from_title: "Asker",
           question: "Which auth header?",
-          "opencode.origin": { kind: "session", sessionID: asker.id, title: "Asker" },
         })
         expect(item?.payload.text).toContain("It is not from the user")
         expect(item?.payload.text).toContain(`"question_id": "${item?.id}"`)
@@ -285,7 +284,6 @@ describe("AskTool", () => {
           kind: "answer",
           replyTo: question.id,
           from: target.id,
-          "opencode.origin": { kind: "session", sessionID: target.id, title: "Target" },
         })
         expect(reply?.payload.text).toContain(`to your question ${question.id}`)
         expect(reply?.payload.text).toContain("do not reply to it")
@@ -420,7 +418,6 @@ describe("AskTool", () => {
             from: asker.id,
             to: target.id,
             from_title: "Asker",
-            "opencode.origin": { kind: "session", sessionID: asker.id, title: "Asker" },
           },
         })
 
@@ -437,39 +434,9 @@ describe("AskTool", () => {
               kind: "answer",
               replyTo: queued.id,
               from: target.id,
-              "opencode.origin": { kind: "session", sessionID: target.id, title: "Target" },
             },
             text: expect.stringContaining("Session answer."),
           },
-        })
-      }),
-    ),
-  )
-
-  it.live("stamps the shared session origin on both legs", () =>
-    withTempDir((dir) =>
-      Effect.gen(function* () {
-        const asker = yield* createSession(dir.path, "Asker")
-        const target = yield* createSession(dir.path, "Target")
-        const registry = yield* Tool.Service
-
-        yield* ask(registry, asker.id, { session: target.id, question: "Which auth header?" })
-        const [question] = yield* syntheticInbox(target.id)
-        if (question === undefined) return yield* Effect.die(new Error("expected a pending question"))
-        expect(question.payload.metadata?.["opencode.origin"]).toEqual({
-          kind: "session",
-          sessionID: asker.id,
-          title: "Asker",
-        })
-
-        expect(yield* answer(registry, target.id, { replyTo: question.id, answer: "Use Bearer." })).toMatchObject({
-          status: "completed",
-        })
-        const [reply] = yield* syntheticInbox(asker.id)
-        expect(reply?.payload.metadata?.["opencode.origin"]).toEqual({
-          kind: "session",
-          sessionID: target.id,
-          title: "Target",
         })
       }),
     ),
