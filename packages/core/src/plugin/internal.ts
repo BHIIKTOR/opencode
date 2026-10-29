@@ -68,6 +68,7 @@ import { Skill } from "../skill.js"
 import { SkillDiscovery } from "../skill/discovery.js"
 import { Watcher } from "../filesystem/watcher.js"
 import { PatchTool } from "../tool/plugin/patch.js"
+import { AskTool } from "../tool/plugin/ask.js"
 import { EditTool } from "../tool/plugin/edit.js"
 import { GlobTool } from "../tool/plugin/glob.js"
 import { GrepTool } from "../tool/plugin/grep.js"
@@ -233,6 +234,7 @@ const pre = [
   ...OptimizePlugin.Plugins,
   VerbosityPlugin.Plugin,
   IdentityPlugin.Plugin,
+  AskTool.Plugin,
   EditTool.Plugin,
   GlobTool.Plugin,
   GrepTool.Plugin,
